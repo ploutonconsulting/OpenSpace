@@ -30,7 +30,7 @@ Today's AI agents — [OpenClaw](https://github.com/openclaw/openclaw), [nanobot
 
 **🚀 🚀 The self-evolving engine where every task makes every agent smarter and more cost-efficient.**
 
-https://github.com/user-attachments/assets/e7feee15-7106-4f9c-8d58-4c4a772bdfc9
+https://github.com/user-attachments/assets/c50f70ab-f6db-47bf-9498-3210c0f0abae
 
 OpenSpace plugs into any agent as skills and evolves it with three superpowers:
 
