@@ -625,7 +625,7 @@ class OpenSpace:
         # 2. User-specified skill directories from config_grounding.json
         if skill_cfg and skill_cfg.skill_dirs:
             for d in skill_cfg.skill_dirs:
-                p = Path(d)
+                p = Path(d).expanduser()
                 if p in skill_paths:
                     continue  # Already added via OPENSPACE_HOST_SKILL_DIRS
                 if p.exists():
