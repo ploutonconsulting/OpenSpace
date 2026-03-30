@@ -857,7 +857,8 @@ def run_mcp_server() -> None:
     args = parser.parse_args()
 
     if args.transport == "sse":
-        mcp.run(transport="sse", sse_params={"port": args.port})
+        mcp.settings.port = args.port
+        mcp.run(transport="sse")
     else:
         mcp.run(transport="stdio")
 

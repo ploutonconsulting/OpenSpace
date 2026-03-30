@@ -1,0 +1,12 @@
+services:
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    container_name: openspace-dashboard
+    ports:
+      - "7788:7788"
+    volumes:
+      - ./.openspace:/app/.openspace
+      - ./logs:/app/logs
+    restart: unless-stopped

@@ -293,14 +293,17 @@ class SkillRegistry:
     def register_skill_dir(self, skill_dir: Path) -> Optional[SkillMeta]:
         """Register a single skill directory (hot-reload).
 
+        Idempotent: if the skill is already registered, refreshes the cached
+        content from disk and returns the existing :class:`SkillMeta`.
+
         Safety: applies ``check_skill_safety`` / ``is_skill_safe`` filtering.
 
         Args:
             skill_dir: Path to a directory containing ``SKILL.md``.
 
         Returns:
-            :class:`SkillMeta` if newly registered, ``None`` if already
-            present, the directory is invalid, or the skill fails safety checks.
+            :class:`SkillMeta` on success (newly registered or already present),
+            ``None`` if the directory is invalid or the skill fails safety checks.
         """
         skill_file = skill_dir / "SKILL.md"
         if not skill_file.exists():
@@ -320,8 +323,11 @@ class SkillRegistry:
 
             meta = self._parse_skill(skill_dir.name, skill_dir, skill_file, content)
             if meta.skill_id in self._skills:
-                logger.debug(f"register_skill_dir: {meta.skill_id} already exists")
-                return None
+                # Refresh cached content so callers (e.g. fix_skill) see
+                # the latest version from disk.
+                self._content_cache[meta.skill_id] = content
+                logger.debug(f"register_skill_dir: {meta.skill_id} already registered, content refreshed")
+                return self._skills[meta.skill_id]
             self._skills[meta.skill_id] = meta
             self._content_cache[meta.skill_id] = content
             logger.info(f"Hot-registered skill: {meta.skill_id}")
