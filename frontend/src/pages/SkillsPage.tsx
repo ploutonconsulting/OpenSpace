@@ -21,7 +21,7 @@ export default function SkillsPage() {
       setError(null);
       try {
         const [skillItems, skillStats] = await Promise.all([
-          skillsApi.listSkills({ activeOnly: false, sort, limit: 200 }),
+          skillsApi.listSkills({ activeOnly: true, sort, limit: 200 }),
           skillsApi.getSkillStats(),
         ]);
         if (!cancelled) {
