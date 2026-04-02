@@ -5,6 +5,7 @@ All methods are **synchronous** (use ``urllib``).  In async contexts
 
 Provides both low-level HTTP operations and higher-level workflows:
   - ``fetch_record`` / ``download_artifact`` / ``fetch_metadata``
+  - ``search_record_embeddings``
   - ``stage_artifact`` / ``create_record``
   - ``upload_skill`` (stage → diff → create — full workflow)
   - ``import_skill`` (fetch → download → extract — full workflow)
@@ -29,6 +30,7 @@ logger = logging.getLogger("openspace.cloud")
 
 SKILL_FILENAME = "SKILL.md"
 SKILL_ID_FILENAME = ".skill_id"
+RECORD_EMBEDDING_SEARCH_MAX_LIMIT = 300
 
 _TEXT_EXTENSIONS = frozenset({
     ".md", ".txt", ".yaml", ".yml", ".json", ".py", ".sh", ".toml",
@@ -141,6 +143,33 @@ class OpenSpaceClient:
                 break
 
         return all_items
+
+    def search_record_embeddings(
+        self,
+        *,
+        query: str,
+        limit: int = RECORD_EMBEDDING_SEARCH_MAX_LIMIT,
+        level: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
+        """POST /records/embeddings/search — fetch server-ranked embedding rows."""
+        search_request_payload: Dict[str, Any] = {
+            "query": query,
+            "limit": limit,
+        }
+        if level:
+            search_request_payload["level"] = level
+        if tags:
+            search_request_payload["tags"] = tags
+
+        _, response_body = self._request(
+            "POST",
+            "/records/embeddings/search",
+            body=json.dumps(search_request_payload).encode("utf-8"),
+            extra_headers={"Content-Type": "application/json"},
+            timeout=30,
+        )
+        return json.loads(response_body.decode("utf-8"))
 
     def stage_artifact(self, skill_dir: Path) -> tuple[str, int]:
         """POST /artifacts/stage — upload skill files.

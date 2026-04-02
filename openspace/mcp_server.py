@@ -368,63 +368,48 @@ async def _cloud_search_and_import(task: str, limit: int = 8) -> List[Dict[str, 
     """Search cloud for skills relevant to *task* and auto-import top hits.
 
     This is **stage 1** of a two-stage pipeline:
-      Stage 1 (here): cloud BM25+embedding → pick top-N to import locally.
+      Stage 1 (here): server-side embedding search → pick top-N to import locally.
       Stage 2 (tool_layer): local BM25 + LLM → select from ALL local skills
                             (including ones just imported) for injection.
 
     Stage 1 intentionally imports more than will be used (default: 8) so
-    that stage 2 has a larger pool to choose from.  The two BM25 passes
-    are NOT redundant — stage 1 filters thousands of cloud candidates down
+    that stage 2 has a larger pool to choose from. Stage 1 relies on the
+    server's embedding search to filter thousands of cloud candidates down
     to a manageable import set; stage 2 makes the final task-specific choice.
     """
     try:
-        from openspace.cloud.search import (
-            SkillSearchEngine, build_cloud_candidates,
-        )
-        from openspace.cloud.embedding import generate_embedding, resolve_embedding_api
-
-        client = _get_cloud_client()
-        embedding_api_key, _ = resolve_embedding_api()
-        has_embedding = bool(embedding_api_key)
-
-        items = await asyncio.to_thread(
-            client.fetch_metadata, include_embedding=has_embedding, limit=200,
-        )
-        if not items:
+        normalized_task_query = task.strip()
+        if not normalized_task_query:
             return []
 
-        candidates = build_cloud_candidates(items)
-        if not candidates:
+        cloud_client = _get_cloud_client()
+        cloud_search_results = await asyncio.to_thread(
+            cloud_client.search_record_embeddings,
+            query=normalized_task_query,
+            limit=min(limit * 2, 300),
+        )
+        if not cloud_search_results:
             return []
 
-        query_embedding: Optional[List[float]] = None
-        if has_embedding:
-            query_embedding = await asyncio.to_thread(
-                generate_embedding, task,
-            )
-
-        engine = SkillSearchEngine()
-        results = engine.search(task, candidates, query_embedding=query_embedding, limit=limit * 2)
-
-        cloud_hits = [
-            r for r in results
-            if r.get("source") == "cloud"
-            and r.get("visibility", "public") == "public"
-            and r.get("skill_id")
+        public_cloud_hits = [
+            cloud_result for cloud_result in cloud_search_results
+            if cloud_result.get("visibility", "public") == "public"
+            and cloud_result.get("record_id")
         ][:limit]
 
         import_results: List[Dict[str, Any]] = []
-        for hit in cloud_hits:
+        for cloud_hit in public_cloud_hits:
             try:
-                imp = await _do_import_cloud_skill(skill_id=hit["skill_id"])
+                skill_id = cloud_hit["record_id"]
+                imp = await _do_import_cloud_skill(skill_id=skill_id)
                 import_results.append({
-                    "skill_id": hit["skill_id"],
-                    "name": hit.get("name", ""),
+                    "skill_id": skill_id,
+                    "name": cloud_hit.get("name", ""),
                     "import_status": imp.get("status", "error"),
                     "local_path": imp.get("local_path", ""),
                 })
             except Exception as e:
-                logger.warning(f"Cloud import failed for {hit['skill_id']}: {e}")
+                logger.warning(f"Cloud import failed for {skill_id}: {e}")
 
         if import_results:
             logger.info(f"Cloud search imported {len(import_results)} skill(s)")
